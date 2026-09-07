@@ -3,7 +3,7 @@ agent any
 
 ```
 environment {
-    DOCKER_IMAGE = "YOUR_DOCKERHUB_USERNAME/swiggy"
+    DOCKER_IMAGE = "mrunmaya22/swiggy"
 }
 
 stages {
@@ -32,8 +32,8 @@ stages {
             withCredentials([
                 usernamePassword(
                     credentialsId: 'dockerhub-credentials',
-                    usernameVariable: 'DOCKER_USERNAME',
-                    passwordVariable: 'DOCKER_PASSWORD'
+                    usernameVariable: 'msrout22@gmail.com',
+                    passwordVariable: 'Bedu.1234'
                 )
             ]) {
                 sh '''
