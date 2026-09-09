@@ -1,79 +1,140 @@
 pipeline {
-agent any
 
-```
-environment {
-    DOCKER_IMAGE = "mrunmaya22/swiggy"
-}
+    agent any
 
-stages {
-
-    stage('Checkout') {
-        steps {
-            git 'https://github.com/mrunmayasen/swiggy-nodejs-devops-project.git'
-        }
+    tools {
+        nodejs 'NodeJS installations'
     }
 
-    stage('Install & Test') {
-        steps {
-            sh 'npm install'
-            sh 'npm test -- --watchAll=false'
-        }
+    environment {
+        DOCKER_IMAGE = "mrunmaya22/swiggy"
     }
 
-    stage('Build Docker Image') {
-        steps {
-            sh "docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} ."
-        }
-    }
+    stages {
 
-    stage('Push to Docker Hub') {
-        steps {
-            withCredentials([
-                usernamePassword(
-                    credentialsId: 'dockerhub-credentials',
-                    usernameVariable: 'msrout22@gmail.com',
-                    passwordVariable: 'Bedu.1234'
-                )
-            ]) {
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/mrunmayasen/swiggy-nodejs-devops-project.git'
+            }
+        }
+
+        stage('Node Version') {
+            steps {
                 sh '''
-                    echo "$DOCKER_PASSWORD" | docker login \
-                    -u "$DOCKER_USERNAME" \
-                    --password-stdin
+                    echo "===== Node.js Version ====="
+                    node --version
 
-                    docker push ${DOCKER_IMAGE}:${BUILD_NUMBER}
+                    echo "===== npm Version ====="
+                    npm --version
+                '''
+            }
+        }
 
-                    docker logout
+        stage('Install Dependencies') {
+            steps {
+                sh 'npm install'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'npm test -- --watchAll=false'
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                sh '''
+                    docker build \
+                    -t ${DOCKER_IMAGE}:${BUILD_NUMBER} .
+                '''
+            }
+        }
+
+        stage('Docker Push') {
+            steps {
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
+
+                    sh '''
+                        echo "$DOCKER_PASSWORD" | \
+                        docker login \
+                        --username "$DOCKER_USERNAME" \
+                        --password-stdin
+
+                        docker push ${DOCKER_IMAGE}:${BUILD_NUMBER}
+
+                        docker logout
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to Minikube') {
+            steps {
+
+                sh '''
+                    echo "===== Applying Kubernetes Deployment ====="
+
+                    kubectl apply -f Kubernetes/deployment.yml
+
+                    echo "===== Applying Kubernetes Service ====="
+
+                    kubectl apply -f Kubernetes/service.yml
+
+                    echo "===== Updating Docker Image ====="
+
+                    kubectl set image deployment/swiggy-app \
+                    swiggy-app=${DOCKER_IMAGE}:${BUILD_NUMBER}
+
+                    echo "===== Waiting for Rollout ====="
+
+                    kubectl rollout status deployment/swiggy-app
+                '''
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+
+                sh '''
+                    echo "===== Deployment ====="
+                    kubectl get deployment
+
+                    echo "===== Pods ====="
+                    kubectl get pods -o wide
+
+                    echo "===== Service ====="
+                    kubectl get service
                 '''
             }
         }
     }
 
-    stage('Deploy to Kubernetes') {
-        steps {
-            sh """
-                kubectl apply -f Kubernetes/deployment.yml
-                kubectl apply -f Kubernetes/service.yml
+    post {
 
-                kubectl set image deployment/swiggy-app \
-                swiggy-app=${DOCKER_IMAGE}:${BUILD_NUMBER}
+        success {
+            echo '''
+            ============================================
+               SWIGGY APPLICATION DEPLOYED SUCCESSFULLY
+            ============================================
+            '''
+        }
 
-                kubectl rollout status deployment/swiggy-app
-            """
+        failure {
+            echo '''
+            ============================================
+               PIPELINE FAILED
+               Check the Jenkins Console Output
+            ============================================
+            '''
         }
     }
-}
-
-post {
-    success {
-        echo "Swiggy application deployed successfully!"
-        echo "Docker Image: ${DOCKER_IMAGE}:${BUILD_NUMBER}"
-    }
-
-    failure {
-        echo "Pipeline failed. Check the Jenkins console output."
-    }
-}
-```
-
 }
