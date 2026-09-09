@@ -10,7 +10,7 @@ stages {
 
     stage('Checkout') {
         steps {
-            git 'https://github.com/nareshdevopscloud/swiggy-devops-project.git'
+            git 'https://github.com/mrunmayasen/swiggy-nodejs-devops-project.git'
         }
     }
 
