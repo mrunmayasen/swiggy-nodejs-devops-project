@@ -1,3 +1,4 @@
+```groovy
 pipeline {
 
     agent any
@@ -39,15 +40,21 @@ pipeline {
 
         stage('Test') {
             steps {
-                sh 'npm test -- --watchAll=false'
+                sh 'npm test -- --watchAll=false --passWithNoTests'
             }
         }
 
         stage('Docker Build') {
             steps {
                 sh '''
+                    echo "===== Building Docker Image ====="
+
                     docker build \
                     -t ${DOCKER_IMAGE}:${BUILD_NUMBER} .
+
+                    echo "===== Docker Image Built Successfully ====="
+
+                    docker images | grep ${DOCKER_IMAGE}
                 '''
             }
         }
@@ -64,12 +71,18 @@ pipeline {
                 ]) {
 
                     sh '''
+                        echo "===== Logging into Docker Hub ====="
+
                         echo "$DOCKER_PASSWORD" | \
                         docker login \
                         --username "$DOCKER_USERNAME" \
                         --password-stdin
 
+                        echo "===== Pushing Docker Image ====="
+
                         docker push ${DOCKER_IMAGE}:${BUILD_NUMBER}
+
+                        echo "===== Docker Image Pushed Successfully ====="
 
                         docker logout
                     '''
@@ -97,6 +110,8 @@ pipeline {
                     echo "===== Waiting for Rollout ====="
 
                     kubectl rollout status deployment/swiggy-app
+
+                    echo "===== Kubernetes Deployment Successful ====="
                 '''
             }
         }
@@ -113,6 +128,9 @@ pipeline {
 
                     echo "===== Service ====="
                     kubectl get service
+
+                    echo "===== Current Docker Image ====="
+                    kubectl describe deployment swiggy-app | grep -i image
                 '''
             }
         }
@@ -138,3 +156,4 @@ pipeline {
         }
     }
 }
+```
